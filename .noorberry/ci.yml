@@ -7,3 +7,5 @@ checks:
     run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
   test:
     missing: "Projekt nemá testovací sadu. Další krok: dočasný WordPress + WooCommerce + DB, syntetické produkty, mock Airtable API (synchronizace umí mazat produkty)."
+  security:
+    run: python3 .noorberry/nbci_security.py . --install-tools

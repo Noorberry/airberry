@@ -153,6 +153,17 @@ def cmd_run():
     env["CI"] = "true"
 
     defs = cfg.get("checks") or {}
+    # Bezpečnost jako první: čte jen soubory. Při nálezu se nic neinstaluje ani nespouští.
+    if "security" in checks and "run" in (defs.get("security") or {}):
+        print(f"::group::security: {defs['security']['run']}")
+        st, rc, dur = run_cmd(defs["security"]["run"], wd, env, deadline - time.monotonic())
+        print("::endgroup::")
+        results.append({"check": "security", "status": st, "rc": rc, "seconds": dur})
+        checks = [c for c in checks if c != "security"]
+        if st != "passed":
+            results += [{"check": c, "status": "not_run", "detail": "bezpečnostní kontrola neprošla – instalace a testy nespuštěny"}
+                        for c in checks]
+            return finish("failure", results, notes, topics, mode)
     install_needed = any("run" in (defs.get(c) or {}) for c in checks)
     if cfg.get("install") and install_needed:
         st, rc, dur = run_cmd(cfg["install"], wd, env, deadline - time.monotonic())
