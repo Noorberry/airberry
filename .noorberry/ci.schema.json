@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Noorberry/dev-infra/schema/ci.schema.json",
+  "title": "Noorberry CI – .noorberry/ci.yml",
+  "description": "Konfigurace kontrol projektu. Příkazy musí odpovídat skutečnému projektu; chybějící kontrola se značí missing, nikdy prázdným příkazem.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "profile"],
+  "properties": {
+    "version": {"const": 1},
+    "profile": {
+      "type": "string",
+      "enum": ["node", "vite", "python", "php-lint", "wordpress-plugin", "static"]
+    },
+    "working_directory": {"$ref": "#/$defs/relpath", "default": "."},
+    "arch": {
+      "description": "Architektury, na kterých projekt prokazatelně funguje.",
+      "type": "array",
+      "items": {"enum": ["arm64", "x64"]},
+      "minItems": 1,
+      "uniqueItems": true,
+      "default": ["arm64", "x64"]
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"},
+        "python": {"type": "string", "pattern": "^3\\.[0-9]+$"},
+        "php": {"type": "string", "pattern": "^[78]\\.[0-9]+$"}
+      }
+    },
+    "install": {"$ref": "#/$defs/command"},
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lint": {"$ref": "#/$defs/check"},
+        "test": {"$ref": "#/$defs/check"},
+        "build": {"$ref": "#/$defs/check"},
+        "e2e": {"$ref": "#/$defs/check"},
+        "security": {"$ref": "#/$defs/check"}
+      }
+    },
+    "extended": {
+      "description": "Příkazy pro ci-nightly / ci-weekly. Pokud chybí, rozšířený běh spustí všechny definované checks.",
+      "type": "array",
+      "items": {"enum": ["lint", "test", "build", "e2e", "security"]},
+      "uniqueItems": true
+    },
+    "services": {
+      "description": "Testovací služby (kontejnery). Na Oracle až po ověření rootless runtime.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "image"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,30}$"},
+          "image": {"type": "string", "pattern": "^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$"},
+          "env": {"$ref": "#/$defs/env"}
+        }
+      }
+    },
+    "env": {"$ref": "#/$defs/env"},
+    "timeout_minutes": {"type": "integer", "minimum": 1, "maximum": 60}
+  },
+  "$defs": {
+    "relpath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/@ -]+$"
+    },
+    "command": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "env": {
+      "description": "Jen netajné hodnoty. Tajemství sem nepatří.",
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]{0,63}$"},
+      "additionalProperties": {"type": ["string", "number", "boolean"]}
+    },
+    "check": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run"],
+          "properties": {
+            "run": {"$ref": "#/$defs/command"},
+            "requires_services": {"type": "boolean", "default": false}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["missing"],
+          "properties": {
+            "missing": {"type": "string", "minLength": 3, "description": "Proč kontrola zatím neexistuje."}
+          }
+        }
+      ]
+    }
+  }
+}
