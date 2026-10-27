@@ -1,0 +1,60 @@
+# Generováno z Noorberry/dev-infra (templates/noorberry-ci.yml.tmpl) – needitovat ručně.
+# Výběr kontrol: GitHub Topics repozitáře. Příkazy: .noorberry/ci.yml. Runner: centrální politika.
+name: Noorberry CI
+run-name: ${{ inputs.nbci_key || github.event.head_commit.message || github.ref_name }}
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: push | nightly | weekly | nightly+weekly
+        default: push
+        type: string
+      nbci_key:
+        description: Korelační klíč plánovače (neměnit)
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nbci-${{ github.event.pull_request.number || github.ref }}-${{ inputs.mode || 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  nbci:
+    # Stabilní název kontroly. Přeskočeno = nezapojeno nebo ci-paused (nikdy se nehlásí jako úspěch).
+    name: Noorberry CI
+    if: ${{ contains(github.event.repository.topics, 'noorberry-ci') && !contains(github.event.repository.topics, 'ci-paused') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # celá historie – hledání tajemství musí vidět i staré commity
+      - id: cfg
+        run: python3 .noorberry/nbci_run.py plan
+      - if: ${{ steps.cfg.outputs.node != '' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.cfg.outputs.node }}
+      - if: ${{ steps.cfg.outputs.python != '' }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ steps.cfg.outputs.python }}
+      - name: Kontroly
+        env:
+          NBCI_MODE: ${{ inputs.mode || 'push' }}
+          NBCI_TIMEOUT_MIN: "30"
+        run: python3 .noorberry/nbci_run.py run
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nbci-result
+          path: nbci-result.json
+          retention-days: 7
+          if-no-files-found: warn
