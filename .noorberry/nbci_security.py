@@ -57,7 +57,7 @@ def install_tools(dest):
         target.chmod(0o755)
     subprocess.run([sys.executable, "-m", "venv", str(dest / "venv")], check=True)
     subprocess.run([str(dest / "venv/bin/pip"), "install", "-q", *PIP_TOOLS], check=True)
-SKIP_DIRS = {"node_modules", ".git", "vendor", "dist", "build", ".venv", "venv"}
+SKIP_DIRS = {"node_modules", ".git", "vendor", "dist", "build", ".venv", "venv", ".noorberry"}
 
 
 def tool(name):
@@ -170,7 +170,7 @@ def check_code(repo, rep):
     exe = tool("semgrep")
     if exe:
         rc, out, err = run([exe, "scan", "--config", "p/default", "--json", "--metrics=off", "--quiet",
-                            "--timeout", "30", str(repo)], timeout=1200)
+                            "--timeout", "30", "--exclude", ".noorberry", str(repo)], timeout=1200)
         if rc in (0, 1) and out.strip():
             for r in json.loads(out).get("results") or []:
                 sev = {"ERROR": "high", "WARNING": "medium"}.get(r["extra"].get("severity"), "low")
